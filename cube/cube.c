@@ -447,6 +447,7 @@ struct demo {
     bool use_break;
     bool suppress_popups;
     bool force_errors;
+    bool force_present_from_compute;
 
     PFN_vkCreateDebugUtilsMessengerEXT CreateDebugUtilsMessengerEXT;
     PFN_vkDestroyDebugUtilsMessengerEXT DestroyDebugUtilsMessengerEXT;
@@ -1084,7 +1085,8 @@ static void demo_draw(struct demo *demo) {
         // present queue before presenting, waiting for the draw complete
         // semaphore and signalling the ownership released semaphore when finished
         VkFence nullFence = VK_NULL_HANDLE;
-        pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        pipe_stage_flags = (demo->force_present_from_compute) ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+                                                              : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         submit_info.waitSemaphoreCount = 1;
         submit_info.pWaitSemaphores = &demo->draw_complete_semaphores[demo->frame_index];
         submit_info.commandBufferCount = 1;
@@ -1340,7 +1342,7 @@ static void demo_prepare_buffers(struct demo *demo) {
                 .width = swapchainExtent.width,
                 .height = swapchainExtent.height,
             },
-        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT, // temp WA: overlay does not set storage bit.
         .preTransform = preTransform,
         .compositeAlpha = compositeAlpha,
         .imageArrayLayers = 1,
@@ -3695,15 +3697,18 @@ static void demo_init_vk_swapchain(struct demo *demo) {
     uint32_t graphicsQueueFamilyIndex = UINT32_MAX;
     uint32_t presentQueueFamilyIndex = UINT32_MAX;
     for (uint32_t i = 0; i < demo->queue_family_count; i++) {
-        if ((demo->queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
+        bool graphicsCapable = (demo->queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
+        bool compueCapable = (demo->queue_props[i].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0;
+
+        if (graphicsCapable) {
             if (graphicsQueueFamilyIndex == UINT32_MAX) {
                 graphicsQueueFamilyIndex = i;
             }
-
-            if (supportsPresent[i] == VK_TRUE) {
-                graphicsQueueFamilyIndex = i;
-                presentQueueFamilyIndex = i;
-                break;
+            if (!demo->force_present_from_compute) {
+                if (supportsPresent[i] == VK_TRUE) {
+                    presentQueueFamilyIndex = i;
+                    break;
+                }
             }
         }
     }
@@ -3712,9 +3717,19 @@ static void demo_init_vk_swapchain(struct demo *demo) {
         // If didn't find a queue that supports both graphics and present, then
         // find a separate present queue.
         for (uint32_t i = 0; i < demo->queue_family_count; ++i) {
+            bool graphicsCapable = (demo->queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
+            bool compueCapable = (demo->queue_props[i].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0;
+
             if (supportsPresent[i] == VK_TRUE) {
-                presentQueueFamilyIndex = i;
-                break;
+                if (demo->force_present_from_compute) {
+                    if (compueCapable && !graphicsCapable) {
+                        presentQueueFamilyIndex = i;
+                        break;
+                    }
+                } else {
+                    presentQueueFamilyIndex = i;
+                    break;
+                }
             }
         }
     }
@@ -4025,6 +4040,10 @@ static void demo_init(struct demo *demo, int argc, char **argv) {
             demo->force_errors = true;
             continue;
         }
+        if (strcmp(argv[i], "--force_present_from_compute_queue") == 0) {
+            demo->force_present_from_compute = true;
+            continue;
+        }
 
 #if defined(ANDROID)
         ERR_EXIT("Usage: vkcube [--validate]\n", "Usage");
@@ -4041,7 +4060,8 @@ static void demo_init(struct demo *demo, int argc, char **argv) {
             "\t\tVK_PRESENT_MODE_IMMEDIATE_KHR = %d\n"
             "\t\tVK_PRESENT_MODE_MAILBOX_KHR = %d\n"
             "\t\tVK_PRESENT_MODE_FIFO_KHR = %d\n"
-            "\t\tVK_PRESENT_MODE_FIFO_RELAXED_KHR = %d\n";
+            "\t\tVK_PRESENT_MODE_FIFO_RELAXED_KHR = %d\n"
+            "\t[--force_present_from_compute_queue]\n";
         int length = snprintf(NULL, 0, message, APP_SHORT_NAME, VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR,
                               VK_PRESENT_MODE_FIFO_KHR, VK_PRESENT_MODE_FIFO_RELAXED_KHR);
         char *usage = (char *)malloc(length + 1);
