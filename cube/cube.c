@@ -483,8 +483,15 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_messenger_callback(VkDebugUtilsMessageSever
                                                         VkDebugUtilsMessageTypeFlagsEXT messageType,
                                                         const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
                                                         void *pUserData) {
+    if (pCallbackData->pNext) {
+        VkDeviceAddressBindingCallbackDataEXT *binding = (VkDeviceAddressBindingCallbackDataEXT*)(pCallbackData->pNext);
+        if (binding->sType == VK_STRUCTURE_TYPE_DEVICE_ADDRESS_BINDING_CALLBACK_DATA_EXT) {
+            uint32_t nic = 0;
+            nic++;
+        }
+    }
     char prefix[64] = "";
-    char *message = (char *)malloc(strlen(pCallbackData->pMessage) + 5000);
+    char *message = (char *)malloc(pCallbackData->pMessage ? (strlen(pCallbackData->pMessage) + 5000) : 5000);
     assert(message);
     struct demo *demo = (struct demo *)pUserData;
 
@@ -556,7 +563,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_messenger_callback(VkDebugUtilsMessageSever
 #ifdef _WIN32
 
     in_callback = true;
-    if (!demo->suppress_popups) MessageBox(NULL, message, "Alert", MB_OK);
+    //if (!demo->suppress_popups) MessageBox(NULL, message, "Alert", MB_OK);
+    OutputDebugString(message);
     in_callback = false;
 
 #elif defined(ANDROID)
@@ -3347,11 +3355,13 @@ static void demo_init_vk(struct demo *demo) {
         dbg_messenger_create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
         dbg_messenger_create_info.pNext = NULL;
         dbg_messenger_create_info.flags = 0;
-        dbg_messenger_create_info.messageSeverity =
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        dbg_messenger_create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                                    VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                                                    VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
         dbg_messenger_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                                                 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                                                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+                                                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+                                                VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
         dbg_messenger_create_info.pfnUserCallback = debug_messenger_callback;
         dbg_messenger_create_info.pUserData = demo;
         inst_info.pNext = &dbg_messenger_create_info;
@@ -3591,9 +3601,15 @@ static void demo_create_device(struct demo *demo) {
     queues[0].pQueuePriorities = queue_priorities;
     queues[0].flags = 0;
 
+    VkPhysicalDeviceAddressBindingReportFeaturesEXT deviceAddressBindingFeatures = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ADDRESS_BINDING_REPORT_FEATURES_EXT,
+        .pNext = NULL,
+        .reportAddressBinding = VK_TRUE,
+    };
+
     VkDeviceCreateInfo device = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = NULL,
+        .pNext = &deviceAddressBindingFeatures,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos = queues,
         .enabledLayerCount = 0,
