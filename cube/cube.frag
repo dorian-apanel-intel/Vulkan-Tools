@@ -18,7 +18,7 @@
 /*
  * Fragment shader for cube demo
  */
-#version 400
+#version 430
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
 layout (binding = 1) uniform sampler2D tex;

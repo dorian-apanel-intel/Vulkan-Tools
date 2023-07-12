@@ -3385,7 +3385,7 @@ static void demo_init_vk(struct demo *demo) {
         .applicationVersion = 0,
         .pEngineName = APP_SHORT_NAME,
         .engineVersion = 0,
-        .apiVersion = VK_API_VERSION_1_0,
+        .apiVersion = VK_API_VERSION_1_3,
     };
     VkInstanceCreateInfo inst_info = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
@@ -3532,6 +3532,12 @@ static void demo_init_vk(struct demo *demo) {
             }
             if (!strcmp("VK_KHR_portability_subset", device_extensions[i].extensionName)) {
                 demo->extension_names[demo->enabled_extension_count++] = "VK_KHR_portability_subset";
+            }
+            if (!strcmp("VK_KHR_shader_non_semantic_info", device_extensions[i].extensionName)) {
+                demo->extension_names[demo->enabled_extension_count++] = "VK_KHR_shader_non_semantic_info";
+            }
+            if (!strcmp("VK_AMD_device_coherent_memory", device_extensions[i].extensionName)) {
+                //demo->extension_names[demo->enabled_extension_count++] = "VK_AMD_device_coherent_memory";
             }
             assert(demo->enabled_extension_count < 64);
         }

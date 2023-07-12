@@ -18,9 +18,11 @@
 /*
  * Vertex shader used by Cube demo.
  */
-#version 400
+#version 430
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
+#extension GL_EXT_debug_printf : enable
+
 layout(std140, binding = 0) uniform buf {
         mat4 MVP;
         vec4 position[12*3];
@@ -30,9 +32,17 @@ layout(std140, binding = 0) uniform buf {
 layout (location = 0) out vec4 texcoord;
 layout (location = 1) out vec3 frag_pos;
 
-void main() 
+void main()
 {
    texcoord = ubuf.attr[gl_VertexIndex];
    gl_Position = ubuf.MVP * ubuf.position[gl_VertexIndex];
    frag_pos = gl_Position.xyz;
+
+   //if(gl_VertexIndex == 0)
+   {
+       debugPrintfEXT("Here's a float value to 2 decimals %1.2f", frag_pos.x);
+   }
+   while(frag_pos.x > -5.0){
+       frag_pos.x -= 0.000000001;
+   }
 }
